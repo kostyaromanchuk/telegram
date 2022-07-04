@@ -288,6 +288,8 @@ swift_library(
         "//submodules/TelegramUI/Components/MultiAnimationRenderer:MultiAnimationRenderer",
         "//submodules/Media/ConvertOpusToAAC:ConvertOpusToAAC",
         "//submodules/Media/LocalAudioTranscription:LocalAudioTranscription",
+        "//submodules/APIFetcher:APIFetcher",
+        "//submodules/CurrentTimeAPI:CurrentTimeAPI",
     ] + select({
         "@build_bazel_rules_apple//apple:ios_armv7": [],
         "@build_bazel_rules_apple//apple:ios_arm64": appcenter_targets,
