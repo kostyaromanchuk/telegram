@@ -69,6 +69,8 @@ import CreateExternalMediaStreamScreen
 import PaymentMethodUI
 import PremiumUI
 import InstantPageCache
+import APIFetcher
+import CurrentTimeAPI
 
 protocol PeerInfoScreenItem: AnyObject {
     var id: AnyHashable { get }
@@ -873,7 +875,7 @@ private func settingsEditingItems(data: PeerInfoScreenData?, state: PeerInfoStat
     return result
 }
 
-private func infoItems(data: PeerInfoScreenData?, context: AccountContext, presentationData: PresentationData, interaction: PeerInfoInteraction, nearbyPeerDistance: Int32?, callMessages: [Message]) -> [(AnyHashable, [PeerInfoScreenItem])] {
+private func infoItems(data: PeerInfoScreenData?, context: AccountContext, presentationData: PresentationData, interaction: PeerInfoInteraction, nearbyPeerDistance: Int32?, callMessages: [Message], currentDate: TimeInterval?) -> [(AnyHashable, [PeerInfoScreenItem])] {
     guard let data = data else {
         return []
     }
@@ -898,8 +900,8 @@ private func infoItems(data: PeerInfoScreenData?, context: AccountContext, prese
     }
     
     if let user = data.peer as? TelegramUser {
-        if !callMessages.isEmpty {
-            items[.calls]!.append(PeerInfoScreenCallListItem(id: 20, messages: callMessages))
+        if !callMessages.isEmpty, let currentDate = currentDate {
+            items[.calls]!.append(PeerInfoScreenCallListItem(id: 20, messages: callMessages, currentDate: currentDate))
         }
         
         if let phone = user.phone {
@@ -1622,6 +1624,7 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, UIScrollViewDelegate 
     private let isOpenedFromChat: Bool
     private let videoCallsEnabled: Bool
     private let callMessages: [Message]
+    private var currentDate: TimeInterval?
     
     let isSettings: Bool
     private let isMediaOnly: Bool
@@ -1705,6 +1708,9 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, UIScrollViewDelegate 
     private let tipsPeerDisposable = MetaDisposable()
     private let cachedFaq = Promise<ResolvedUrl?>(nil)
     
+    private let apiFetcher = APIFetcherImp()
+    private var disposable: Disposable?
+    
     private weak var copyProtectionTooltipController: TooltipController?
     
     private let _ready = Promise<Bool>()
@@ -1722,6 +1728,8 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, UIScrollViewDelegate 
         self.presentationData = controller.presentationData
         self.nearbyPeerDistance = nearbyPeerDistance
         self.callMessages = callMessages
+        self.currentDate = context.sharedContext.cachedCurrentDate
+        
         self.isSettings = isSettings
         self.isMediaOnly = context.account.peerId == peerId && !isSettings
         
@@ -1735,6 +1743,20 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, UIScrollViewDelegate 
         super.init()
         
         self.paneContainerNode.parentController = controller
+        
+        let _ = (apiFetcher.execute(request: API.CurrentTime.time)
+        |> deliverOnMainQueue).start(next: { [weak self] (currentDate: CurrentDateDTO) in
+            guard let strongSelf = self else {
+                return
+            }
+            
+            let transition: ContainedViewLayoutTransition = strongSelf.currentDate == nil ? .animated(duration: 0.3, curve: .spring) : .immediate
+            context.sharedContext.cachedCurrentDate = currentDate.unixtime
+            strongSelf.currentDate = currentDate.unixtime
+            if let (layout, navigationHeight) = strongSelf.validLayout {
+                strongSelf.containerLayoutUpdated(layout: layout, navigationHeight: navigationHeight, transition: transition, additive: true)
+            }
+        })
         
         self._interaction = PeerInfoInteraction(
             openUsername: { [weak self] value in
@@ -7149,7 +7171,7 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, UIScrollViewDelegate 
             insets.left += sectionInset
             insets.right += sectionInset
             
-            let items = self.isSettings ? settingsItems(data: self.data, context: self.context, presentationData: self.presentationData, interaction: self.interaction, isExpanded: self.headerNode.isAvatarExpanded) : infoItems(data: self.data, context: self.context, presentationData: self.presentationData, interaction: self.interaction, nearbyPeerDistance: self.nearbyPeerDistance, callMessages: self.callMessages)
+            let items = self.isSettings ? settingsItems(data: self.data, context: self.context, presentationData: self.presentationData, interaction: self.interaction, isExpanded: self.headerNode.isAvatarExpanded) : infoItems(data: self.data, context: self.context, presentationData: self.presentationData, interaction: self.interaction, nearbyPeerDistance: self.nearbyPeerDistance, callMessages: self.callMessages, currentDate: self.currentDate)
             
             contentHeight += headerHeight
             if !(self.isSettings && self.state.isEditing) {

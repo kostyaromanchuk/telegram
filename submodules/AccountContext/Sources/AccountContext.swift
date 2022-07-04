@@ -683,6 +683,8 @@ public protocol SharedAccountContext: AnyObject {
     var callManager: PresentationCallManager? { get }
     var contactDataManager: DeviceContactDataManager? { get }
     
+    var cachedCurrentDate: TimeInterval? { get set }
+    
     var activeAccountContexts: Signal<(primary: AccountContext?, accounts: [(AccountRecordId, AccountContext, Int32)], currentAuth: UnauthorizedAccount?), NoError> { get }
     var activeAccountsWithInfo: Signal<(primary: AccountRecordId?, accounts: [AccountWithInfo]), NoError> { get }
     

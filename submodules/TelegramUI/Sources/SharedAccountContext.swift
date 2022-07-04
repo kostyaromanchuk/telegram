@@ -92,6 +92,8 @@ public final class SharedAccountContextImpl: SharedAccountContext {
     public var callManager: PresentationCallManager?
     let premiumProductId: String?
     
+    public var cachedCurrentDate: TimeInterval?
+    
     private var callDisposable: Disposable?
     private var callStateDisposable: Disposable?
     
